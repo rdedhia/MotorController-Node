@@ -14,8 +14,8 @@
 
 int main(){
 	//Setting Pins
-	//Totem Control Pins R-PB3, L-PB4
-	DDRB |= _BV(PB3)|_BV(PB4) //To Output
+	//Totem Control Pins R-PD3 (pin 1/OC1A), L-PD2 (pin 2/OC1B)
+	DDRD |= _BV(PD2)|_BV(PD3) //To Output
 	//LED Pin - PB5
 	DDRB |= _BV(PB5) //To Output
 	//Input Pin - PB6
@@ -40,8 +40,16 @@ int main(){
 
 	//Enter Loop
 	uint8_t ch; //Selects ADC Channel
-	for (;;) {
+	double percentage; //Percentage of voltage for speed
 
+	//For PWM
+	// enable timer0 for fast pwm with prescaler of one. 
+   TCCR0A|=(1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00); 
+   TCCR1A|=(1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00); 
+
+	for (;;) {
+		//Select channel 0 for analog input for reading the pot
+		ch = 0;
 		 //Have the lowest 4 bits of ADMUX select the channel we want to read
 		ADMUX |= ch;
 		//Wait for ADC reading
@@ -51,22 +59,31 @@ int main(){
 		//Get the value at PB6 (the button input)
 		val = PINB & _BV(PB6);
 
+		//Getting the percentage voltage of potentiometer
+		percentage = ADC/5.0;
+		
 		//Setting the value at PB6 to the LED at PB5
 		//Based on value, forward or backward
 		if (val == 0) //backward
 			PORTB &= ~_BV(PB5); //Setting LED to Low
-			PORTB |= _BV(PB4);  //Setting Left to Low
-			//backward(ADC); Need to implement analog right
+			PORTB &= ~_BV(PB4);  //Setting Left to Low
+			TCNT1 = 0; //Reset the other timer not for the right motor
+			OCR0A = percentage * 256; //PWM input to Right
+
 		else //forward
 			PORTB |= _BV(PB5); //Setting LED to High
-			PORTB |= _BV(PB3); //Setting Right to Low
-			//forward(ADC); Need to implement analog right
+			PORTB &= ~_BV(PB3); //Setting Right to Low
+			TCNT0 = 0; //Reset the other timer not for the left motor
+			OCR1A = percentage * 256; //PWM input to Left
 	}
 }
 
-//Timer for analog write
-/*
-Use a timer, set minimum time and maximum time for Setting
-low and high to get the right % of time. for percentage of 
-voltage.
-*/
+ISR(TIMER0_COMPA_vect) //Timer Interrupt for OC0A
+{ 
+   PORTD ^= _BV(PD3); // Toggle the right motor
+}
+
+ISR(TIMER1_COMPA_vect) //Timer Interrupt for OC1A
+{ 
+   PORTD ^= _BV(PD2); // Toggle the left motor
+}
