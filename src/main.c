@@ -78,7 +78,11 @@ int main(){
 		}
 	}
 }
-
+//Can Message Handling
+void handleCANmsg(uint8_t destID, uint8_t msgID, char msg[], uint8_t msgLen){
+	 //What messages can this node receive?
+	
+}
 ISR(TIMER0_COMPA_vect) //Timer Interrupt for OC0A
 { 
    PORTD ^= _BV(PD3); // Toggle the right motor
