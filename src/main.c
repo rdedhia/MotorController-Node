@@ -15,11 +15,11 @@
 int main(){
 	//Setting Pins
 	//Totem Control Pins R-PD3 (pin 1/OC1A), L-PD2 (pin 2/OC1B)
-	DDRD |= _BV(PD2)|_BV(PD3) //To Output
+	DDRD |= _BV(PD2)|_BV(PD3); //To Output
 	//LED Pin - PB5
-	DDRB |= _BV(PB5) //To Output
+	DDRB |= _BV(PB5); //To Output
 	//Input Pin - PB6
-	DDRB &= ~_BV(PB6) //To Input
+	DDRB &= ~_BV(PB6); //To Input
 
 	//Setting up all the other things before looping
 	//Enable ADC, set prescalar to 128 (slow down ADC clock)
@@ -32,7 +32,7 @@ int main(){
 	ADMUX |= (1 << ADLAR);
 
 	// Set ADC to Free-Running Mode 
-	ADCSRA |= (1 << ADFR);  
+	ADCSRA &= ~(1 << ADTS0)&~(1 << ADTS1)&~(1 << ADTS2)&~(1 << ADTS3);  
 	// Enable ADC 
 	ADCSRA |= (1 << ADEN);  
 	// Start A2D Conversions 
@@ -44,8 +44,8 @@ int main(){
 
 	//For PWM
 	// enable timer0 for fast pwm with prescaler of one. 
-   TCCR0A|=(1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00); 
-   TCCR1A|=(1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00); 
+   TCCR0A|=(1<<WGM00)|(1<<WGM01)|(1<<COM0A1)|(1<<CS00); 
+   TCCR1A|=(1<<WGM00)|(1<<WGM01)|(1<<COM0A1)|(1<<CS00); 
 
 	for (;;) {
 		//Select channel 0 for analog input for reading the pot
@@ -57,24 +57,25 @@ int main(){
 		while(bit_is_set(ADCSRA, ADSC));
 
 		//Get the value at PB6 (the button input)
-		val = PINB & _BV(PB6);
+		long val = PINB & _BV(PB6);
 
 		//Getting the percentage voltage of potentiometer
 		percentage = ADC/5.0;
 		
 		//Setting the value at PB6 to the LED at PB5
 		//Based on value, forward or backward
-		if (val == 0) //backward
+		if (val == 0){ //backward
 			PORTB &= ~_BV(PB5); //Setting LED to Low
 			PORTB &= ~_BV(PB4);  //Setting Left to Low
 			TCNT1 = 0; //Reset the other timer not for the right motor
 			OCR0A = percentage * 256; //PWM input to Right
-
-		else //forward
+		}
+		else{ //forward
 			PORTB |= _BV(PB5); //Setting LED to High
 			PORTB &= ~_BV(PB3); //Setting Right to Low
 			TCNT0 = 0; //Reset the other timer not for the left motor
 			OCR1A = percentage * 256; //PWM input to Left
+		}
 	}
 }
 
