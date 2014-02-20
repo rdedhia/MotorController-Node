@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+uint8_t SHUTDOWN = 0;
+
 int main(){
     //Setting Pins
     //Totem Control Pins R-PD3 (pin 1/OC1A), L-PD2 (pin 2/OC1B)
@@ -57,13 +59,14 @@ int main(){
         while(bit_is_set(ADCSRA, ADSC));
 
         //Get the value at PB6 (the button input)
-        long val = PINB & _BV(PB6);
+        int val = PINB & _BV(PB6);
 
         //Getting the percentage voltage of potentiometer
         percentage = ADC*5.0;
         
         //Setting the value at PB6 to the LED at PB5
         //Based on value, forward or backward
+        if (SHUTDOWN == 0) {
         if (val == 0){ //backward
             PORTB &= ~_BV(PB5); //Setting LED to Low
             PORTB &= ~_BV(PB4);  //Setting Left to Low
@@ -77,18 +80,48 @@ int main(){
             OCR1A = percentage/1024; //PWM input to Left
         }
     }
+    }
 }
+
+
+
+/*#define NODE_watchdog       0
+#define NODE_bms            1
+#define NODE_speedometer    2
+#define NODE_halleffect     3
+#define NODE_sdlogger       4
+
+#define MSG_critical        0
+#define MSG_warning         1
+#define MSG_speed           2
+#define MSG_voltagelow      3
+#define MSG_shunting        4
+#define MSG_shutdown        5
+#define MSG_data_other      6*/
+
 //Can Message Handling
 void handleCANmsg(uint8_t destID, uint8_t msgID, char msg[], uint8_t msgLen){
-     //What messages can this node receive?
     
+     //if a critical message or shutdown message are sent, shut down the system and stop the clock
+    if (msgID == MSG_critical || msgID == MSG_shutdown || msgID == MSG_voltagelow) {
+        OCR0A = 0;
+        OCR1A = 0;
+        SHUTDOWN = 1;
+        TCCR0B&=~((1<<CS00)|(1<<CS01)|(1<<CS02)); 
+        TCCR1B&=~((1<<CS00)|(1<<CS01)|(1<<CS02)); 
+    }   
+
+    //TODO: handle MSG_warning
 }
+
+
+// This is slow PWM method but we are using fast PWM
 ISR(TIMER0_COMPA_vect) //Timer Interrupt for OC0A
 { 
-   PORTD ^= _BV(PD3); // Toggle the right motor
-}
+/*   PORTD ^= _BV(PD3); // Toggle the right motor
+*/}
 
 ISR(TIMER1_COMPA_vect) //Timer Interrupt for OC1A
 { 
-   PORTD ^= _BV(PD2); // Toggle the left motor
-}
+/*   PORTD ^= _BV(PD2); // Toggle the left motor
+*/}
