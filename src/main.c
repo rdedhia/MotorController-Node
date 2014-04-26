@@ -16,12 +16,14 @@ uint8_t SHUTDOWN = 0;
 
 int main(){
     //Setting Pins
-    //Totem Control Pins R-PD3 (pin 1/OC1A), L-PD2 (pin 2/OC1B)
-    DDRD |= _BV(PD2)|_BV(PD3); //To Output
-    //LED Pin - PB5
-    DDRB |= _BV(PB5); //To Output
-    //Input Pin - PB6
-    DDRB &= ~_BV(PB6); //To Input
+    //Totem Control Pins R-PD4 (pin 1/OC1A), L-PC1 (pin 2/OC1B)
+    DDRD |= _BV(PD4)|_BV(PC1); //To Output
+    //LED Pin - PB3
+    DDRB |= _BV(PB3); //To Output  LED (was PB5)
+    //Input Pin - PB4 (Button)
+    DDRB &= ~_BV(PB4); //To Input direction (was PB6)
+
+    DDRB &= ~_BV(PB2); // Input Throttle
 
     //Setting up all the other things before looping
     //Enable ADC, set prescalar to 128 (slow down ADC clock)
@@ -53,29 +55,31 @@ int main(){
         //Select channel 0 for analog input for reading the pot
         ch = 0;
          //Have the lowest 4 bits of ADMUX select the channel we want to read
-        ADMUX |= ch;
+        ADMUX = (0<<REFS0) | PB2;
         //Wait for ADC reading
         ADCSRA |=  _BV(ADSC);
         while(bit_is_set(ADCSRA, ADSC));
 
-        //Get the value at PB6 (the button input)
-        int val = PINB & _BV(PB6);
+        //Get the value at PB4 (button input)
+        int val = PINB & _BV(PB4);
 
         //Getting the percentage voltage of potentiometer
         percentage = ADC*5.0;
         
         //Setting the value at PB6 to the LED at PB5
         //Based on value, forward or backward
-        if (SHUTDOWN == 0) {
+        if (SHUTDOWN == 0) { //emergency shut off
         if (val == 0){ //backward
-            PORTB &= ~_BV(PB5); //Setting LED to Low
-            PORTB &= ~_BV(PB4);  //Setting Left to Low
+            PORTB &= ~_BV(PB3); //Setting LED to Low
+
+            PORTB &= ~_BV(PD4);  //Setting Left to Low
+
             TCNT1 = 0; //Reset the other timer not for the right motor
             OCR0A = percentage/1024; //PWM input to Right
         }
         else{ //forward
-            PORTB |= _BV(PB5); //Setting LED to High
-            PORTB &= ~_BV(PB3); //Setting Right to Low
+            PORTB |= _BV(PB3); //Setting LED to High
+            PORTB &= ~_BV(PC1); //Setting Right to Low
             TCNT0 = 0; //Reset the other timer not for the left motor
             OCR1A = percentage/1024; //PWM input to Left
         }
@@ -100,8 +104,8 @@ int main(){
 #define MSG_data_other      6*/
 
 //Can Message Handling
-void handleCANmsg(uint8_t destID, uint8_t msgID, char msg[], uint8_t msgLen){
-    
+void handleCANmsg(uint8_t destID, uint8_t msgID, uint8_t* msg, uint8_t msgLen){
+    uint8_t cmd = msg[0];
      //if a critical message or shutdown message are sent, shut down the system and stop the clock
     if (msgID == MSG_critical || msgID == MSG_shutdown || msgID == MSG_voltagelow) {
         OCR0A = 0;
